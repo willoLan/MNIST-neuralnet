@@ -41,7 +41,7 @@ the hidden layers use a simgoid activation function
 the output layer uses a softmax activation function
 """
 class NN:
-    def __init__(self, sizes=[784, 128, 64, 10], epochs=10, lr=0.01):
+    def __init__(self, sizes=[784, 128, 64, 10], epochs=3, lr=0.1):
         self.sizes = sizes
         self.epochs = epochs
         self.lr = lr
@@ -80,7 +80,7 @@ class NN:
         # return output
         return params['A3']
     
-    def back_pass(self, y_train, output):
+    def backpropagate(self, y_train, output):
         params = self.params
         
         change_w = {}
@@ -102,7 +102,7 @@ class NN:
         
         return change_w
     
-    def backpropagate(self, change_w):
+    def update(self, change_w):
         for key, val in change_w.items():
             self.params[key] -= self.lr * val
     
@@ -121,56 +121,58 @@ class NN:
         predictions = []
         for x in test_data:
             values = x.split(',')
-            inputs = np.asarray(values[1:]).astype(float)
-            inputs = (inputs/ 255.0 * 0.99) + 0.01
+            inputs = np.asarray(values[1:]).astype(float) # exclude first value (the label)
+            inputs = (inputs/ 255.0 * 0.99) + 0.01 # avoids overflow; converting the pixel values of 0 - 255 to 0 - 1.0
             targets = np.zeros(10) + 0.01
-            targets[int(values[0])] = 0.99 # soft setting the corresponding neuron to 1
+            targets[int(values[0])] = 0.99 # setting the labels nueron to 0.99
             output = self.feed_forward(inputs)
             # prediction
             pred = np.argmax(output) # gets the index of the max value
-            predictions.append(pred==np.argmax(targets)) # append if the prediction matches the correct label
+            predictions.append(pred==np.argmax(targets)) # append 1 if the prediction matches the correct label, and 0 if not
             
         return np.mean(predictions)    
     
     def train(self, train_list, test_list):
-        self.accuracy_points[0] = self.compute_accuracy(test_list)
-        self.epoch_points[0] = 0
         for i in range(self.epochs):
-            for x in train_list:
+            for x in train_list: # iterate over 10,000 training images
                 values = x.split(',')
                 inputs = np.asarray(values[1:]).astype(float)
                 inputs = (inputs/ 255.0 * 0.99) + 0.01
                 targets = np.zeros(10) + 0.01
-                targets[int(values[0])] = 0.99 # soft setting the corresponding neuron to 1
+                targets[int(values[0])] = 0.99 # setting the labels neuron to 0.99
                 # start learning
                 output = self.feed_forward(inputs)
-                change_w = self.back_pass(targets, output)
-                self.backpropagate(change_w)
+                change_w = self.backpropagate(targets, output)
+                self.update(change_w)
+            # output accuracy at the end of each epoch
             accuracy = self.compute_accuracy(test_list)
             print(f"accuracy for epoch {i + 1} : {round(accuracy * 100, 2)}%")            
         
     
-nn = NN(sizes=[784, 128, 64, 10], epochs=3, lr=0.1)
+nn = NN(sizes=[784, 128, 64, 10], epochs=0, lr=0.1)
 
-# output untrained network
+# output untrained network accuracy
+
 accuracy = nn.compute_accuracy(test_list)
 print(f"accuracy of untrained network : {round(accuracy * 100, 2)}%")
 print("")
 
 # start training
+
 nn.train(train_list, test_list)
 print("")
 
-# create canvas window
+# -- CREATE CANVAS -- #
 
 root = tk.Tk()
 root.title("Draw your digit!")
 
-scale_factor = 8 # variable
+
+scale_factor = 8 # determines the scaled up resolution of the canvas
 canvas_width = 28 * scale_factor
 canvas_height = 28 * scale_factor
 
-canvas = tk.Canvas(root, width=canvas_width, height=canvas_height, bg="white")
+canvas = tk.Canvas(root, width=canvas_width, height=canvas_width, bg="white")
 canvas.pack()
 
 # canvas draw method
@@ -201,32 +203,35 @@ def canvas_to_array():
     flat_data = flat_data[0::3]
    
     canvas_data = np.array(flat_data, dtype=int)
-    canvas_data = np.reshape(canvas_data, (canvas_width,canvas_height))
+    canvas_data = np.reshape(canvas_data, (canvas_width,canvas_width))
     
     formatted_data = np.zeros((28,28), dtype=float)
     
-    # get 28x28 average
+    # downsample to 28 x 28
+    
     summed_pixels = 0
     average_pixel = 0
-    # split canvas up int SF x SF chunks
+    
+    # split canvas up into (scale_factor) x (scale_factor) chunks
+    
     for i in range(0, canvas_width, scale_factor):
-        for j in range(0, canvas_height, scale_factor):
+        for j in range(0, canvas_width, scale_factor):
+            
             # average the pixel data over that chunk
+            
             for p in range(scale_factor):
                 for q in range(scale_factor):
-                    summed_pixels += canvas_data[i+p,j+q]
+                    summed_pixels += canvas_data[i+p,j+q] # sum every pixel value
             # average value
             average_pixel = summed_pixels / (scale_factor*scale_factor)
             # append
-            x = i / scale_factor
-            y = j/scale_factor
-            formatted_data[int(x),int(y)] = average_pixel
-            # reset summed_pixels
+            formatted_data[int(i / scale_factor),int(j / scale_factor)] = average_pixel
             summed_pixels = 0
     
-    formatted_data = formatted_data * 0.99 + 0.1
+    formatted_data = formatted_data * 0.99 + 0.1 # set range to 0 - 1.0
 
-    output = nn.feed_forward(formatted_data.reshape(784,1))
+
+    output = nn.feed_forward(formatted_data.reshape(784,1)) # feed in the drawn image
     
     print(f"the network classifies your drawn image as the number {np.argmax(output)}")
     print(f"the network classifies this with {int(round(np.max(output),2) * 100)}% certainty")
@@ -241,15 +246,15 @@ def canvas_to_array():
 
 # clear canvas
 def clear_canvas():
-    canvas.delete("all")    
-
+    canvas.delete("all")
+    
 capture_button = tk.Button(root, text="capture!", command=canvas_to_array)
 capture_button.pack()
 
 clear_button = tk.Button(root, text="clear", command=clear_canvas)
 clear_button.pack()
+
 # bind the mouse drag event to the draw function
 canvas.bind("<B1-Motion>", draw)
-
 
 root.mainloop()
