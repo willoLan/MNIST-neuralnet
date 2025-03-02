@@ -149,7 +149,7 @@ class NN:
             print(f"accuracy for epoch {i + 1} : {round(accuracy * 100, 2)}%")            
         
     
-nn = NN(sizes=[784, 128, 64, 10], epochs=0, lr=0.1)
+nn = NN(sizes=[784, 128, 64, 10], epochs=3, lr=0.1)
 
 # output untrained network accuracy
 
@@ -174,17 +174,20 @@ canvas_height = 28 * scale_factor
 
 canvas = tk.Canvas(root, width=canvas_width, height=canvas_width, bg="white")
 canvas.pack()
+    
 
-# canvas draw method
-def draw(event):
-    # get the mouse's current position
-    x, y = event.x, event.y
-    r = scale_factor  # brush radius
-    
-    # create a small circle at the mouse position
-    canvas.create_oval(x-r, y-r, x+r, y+r, fill="black", outline="black")
-    
+"""
+After consulting stack overflow for a while, it seems there is no way to get a
+rasterised image of the canvas contents directly in tkinter
+
+the work around proposed was to save the .eps file as a png, and then from there
+read the data
+
+not an *amazingly* efficient workaround, however it does the job!
+"""
+# convert canvas to a rasterized 28 x 28 bitmap imge
 def canvas_to_array():
+    # save .eps file
     canvas.postscript(file="tmp_canvas.eps",                      
                       colormode="gray",
                       width=canvas_width,
@@ -192,13 +195,16 @@ def canvas_to_array():
                       pagewidth=canvas_width-1,
                       pageheight=canvas_height-1)
     
+    # save .png file
     img = Image.open("tmp_canvas.eps")
     img.save("tmp_canvas.png", "png")
     
+    # open .png file
     data = cv2.imread("tmp_canvas.png")
     
     data -= 255 # invert image
     
+    # the data is stored in RGB values, so I take every third value (it is arbitrary, I just decided on the blue value)
     flat_data = data.flatten()
     flat_data = flat_data[0::3]
    
@@ -247,14 +253,24 @@ def canvas_to_array():
 # clear canvas
 def clear_canvas():
     canvas.delete("all")
+   
+def draw(event):
+    # get the mouse's current position
+    x, y = event.x, event.y
+    r = scale_factor  # brush radius
     
+    # create a small circle at the mouse position
+    canvas.create_oval(x-r, y-r, x+r, y+r, fill="black", outline="black")
+    
+# capture button
 capture_button = tk.Button(root, text="capture!", command=canvas_to_array)
 capture_button.pack()
 
+# clear button
 clear_button = tk.Button(root, text="clear", command=clear_canvas)
 clear_button.pack()
 
-# bind the mouse drag event to the draw function
+# bind mouse movement to drawing
 canvas.bind("<B1-Motion>", draw)
 
 root.mainloop()
