@@ -9,64 +9,50 @@ import time as time
 import tkinter as tk
 from PIL import Image
 import cv2
+import os
 
 from numpy.random import rand
+
 np.set_printoptions(threshold=np.inf)
 
-# setting up the MNIST dataset
+# file paths to the MNIST data, in csv format
 
-mnist_train_x = r"C:\MNIST\train-images.idx3-ubyte"
-mnist_train_y = r"C:\MNIST\train-labels.idx1-ubyte"
-mnist_test_x = r"C:\MNIST\t10k-images.idx3-ubyte" #heyy
-mnist_test_y = r"C:\MNIST\t10k-labels.idx1-ubyte"
+train_file_path = r"C:\MNIST\train.csv"
+test_file_path = r"C:\MNIST\test.csv"
 
-def convert(imgf, labelf, outf, n):
-    f = open(imgf, "rb")
-    o = open(outf, "w")
-    l = open(labelf, "rb")
-
-    f.read(16)
-    l.read(8)
-    images = []
-
-    for i in range(n):
-        image = [ord(l.read(1))]
-        for j in range(28*28):
-            image.append(ord(f.read(1)))
-        images.append(image)
-
-    for image in images:
-        o.write(",".join(str(pix) for pix in image)+"\n")
-    f.close()
-    o.close()
-    l.close()
-
-# opening MNIST training file
+# opening MNIST training & test file
     
-train_file = open(r"C:\MNIST\train.csv", "r")
+train_file = open(train_file_path, "r")
 train_list = train_file.readlines()
 train_file.close()
 
-test_file = open(r"C:\MNIST\test.csv", "r")
+test_file = open(test_file_path, "r")
 test_list = test_file.readlines()
 test_file.close()
 
 # create NN class
+"""
+The neural net has 2 hidden layers:
+
+1st - 128 neurons
+2nd - 64 neurons
+
+the hidden layers use a simgoid activation function
+the output layer uses a softmax activation function
+"""
 class NN:
     def __init__(self, sizes=[784, 128, 64, 10], epochs=10, lr=0.01):
         self.sizes = sizes
         self.epochs = epochs
         self.lr = lr
-        self.accuracy_points = np.zeros(epochs + 1)
-        self.epoch_points = np.zeros(epochs + 1)
         
         input_layer = sizes[0]
-        
-        # this is arbitrary; we know we need two hidden layers
         
         hidden_1 = sizes[1]
         hidden_2 = sizes[2]
         output_layer = sizes[3]
+        
+        # np.sqrt(1./hidden_n) is used to scale the randomly initiliased weights
         
         self.params = {
             'W1' : (np.random.randn(hidden_1, input_layer) * np.sqrt(1./hidden_1)), # 128 x 784
@@ -161,8 +147,6 @@ class NN:
                 change_w = self.back_pass(targets, output)
                 self.backpropagate(change_w)
             accuracy = self.compute_accuracy(test_list)
-            self.accuracy_points[i+1] = round(accuracy * 100, 2)
-            self.epoch_points[i+1] = i+1
             print(f"accuracy for epoch {i + 1} : {round(accuracy * 100, 2)}%")            
         
     
@@ -176,16 +160,6 @@ print("")
 # start training
 nn.train(train_list, test_list)
 print("")
-
-plt.scatter(nn.epoch_points, nn.accuracy_points, color='black', marker='o', label='Network Accuracy')
-plt.plot(nn.epoch_points, nn.accuracy_points, color='black')
-plt.xticks(np.arange(int(nn.epoch_points.min()), int(nn.epoch_points.max()) + 1))
-plt.xlabel('Epochs')
-plt.ylabel('Accuracy - %')
-plt.title('Network Accuracy Progession')
-plt.legend()
-plt.show()
-
 
 # create canvas window
 
